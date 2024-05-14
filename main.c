@@ -1,8 +1,8 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 #include <string.h>
+#include <time.h>
 
 typedef enum { NONE = 0, CROSS = 1, ZERO = 2, DRAW = 3 } FieldType;
 typedef enum { RANDOM = 0, EASY = 1, MEDIUM = 2, HARD = 3 } Difficulty;
@@ -11,7 +11,7 @@ typedef enum { RANDOM = 0, EASY = 1, MEDIUM = 2, HARD = 3 } Difficulty;
 #define false 0
 
 typedef struct {
-    FieldType** arr;
+    FieldType* arr;
     int size;
 } Vector;
 
@@ -32,13 +32,10 @@ void Game_Init(Game* game, int size, int player_turn, FieldType player_type_fiel
     game->_difficulty = difficulty;
     game->_turn = (player_turn ? player_type_field : (FieldType)((player_type_field % 2) + 1));
 
-    game->_batlefield.arr = ((FieldType**)malloc(size * sizeof(FieldType*)));
+    game->_batlefield.arr = ((FieldType*)malloc(size*size * sizeof(FieldType)));
     game->_batlefield.size = size;
-    for (int i = 0; i < size; i++) {
-        game->_batlefield.arr[i] = (FieldType*)malloc(size * sizeof(FieldType));
-        for (int j = 0; j < size; j++) {
-            game->_batlefield.arr[i][j] = NONE;
-        }
+    for (int i = 0; i < size * size; i++) {
+        game->_batlefield.arr[i] = NONE;
     }
 }
 
@@ -76,7 +73,7 @@ void Draw(const Vector* const vec) {
         }
         printf("\n|");
         for (int j = 0; j < vec->size; ++j) {
-            printf("%c|", VField(vec->arr[i][j]));
+            printf("%c|", VField(vec->arr[i * vec->size + j]));
         }
         printf("\n");
     }
@@ -153,58 +150,54 @@ FieldType CheckEnd(const Vector* const vec) {
     for (int row = 0; row < vec->size; ++row) {
         bool row_win = true;
         for (int col = 1; col < vec->size; ++col) {
-            if (vec->arr[row][0] != vec->arr[row][col]) {
+            if (vec->arr[row*vec->size] != vec->arr[row * vec->size + col]) {
                 row_win = false;
                 break;
             }
         }
-        if (row_win && vec->arr[row][0] != NONE) {
-            return vec->arr[row][0];
+        if (row_win && vec->arr[row*vec->size] != NONE) {
+            return vec->arr[row*vec->size];
         }
     }
 
-    // Проверяем каждый столбец
     for (int col = 0; col < vec->size; ++col) {
         bool col_win = true;
         for (int row = 1; row < vec->size; ++row) {
-            if (vec->arr[0][col] != vec->arr[row][col]) {
+            if (vec->arr[col] != vec->arr[row * vec->size + col]) {
                 col_win = false;
                 break;
             }
         }
-        if (col_win && vec->arr[0][col] != NONE) {
-            return vec->arr[0][col];
+        if (col_win && vec->arr[col] != NONE) {
+            return vec->arr[col];
         }
     }
 
-    // Проверяем диагонали
     bool diag_win = true;
     for (int i = 1; i < vec->size; ++i) {
-        if (vec->arr[0][0] != vec->arr[i][i]) {
+        if (vec->arr[0] != vec->arr[i * vec->size + i]) {
             diag_win = false;
             break;
         }
     }
-    if (diag_win && vec->arr[0][0] != NONE) {
-        return vec->arr[0][0];
+    if (diag_win && vec->arr[0] != NONE) {
+        return vec->arr[0];
     }
 
     diag_win = true;
     for (int i = 1; i < vec->size; ++i) {
-        if (vec->arr[0][vec->size - 1] != vec->arr[i][vec->size - i - 1]) {
+        if (vec->arr[vec->size - 1] != vec->arr[i * vec->size + vec->size - i - 1]) {
             diag_win = false;
             break;
         }
     }
-    if (diag_win && vec->arr[0][vec->size - 1] != NONE) {
-        return vec->arr[0][vec->size - 1];
+    if (diag_win && vec->arr[vec->size - 1] != NONE) {
+        return vec->arr[vec->size - 1];
     }
 
-    for (int row = 0; row < vec->size; ++row) {
-        for (int col = 0; col < vec->size; ++col) {
-            if (vec->arr[row][col] == NONE) {
-                return NONE;
-            }
+    for (int i = 0; i < vec->size * vec->size; ++i) {
+        if (vec->arr[i] == NONE) {
+            return NONE;
         }
     }
 
@@ -218,21 +211,17 @@ typedef struct {
 
 Changes GetChanges(const Vector* const vec) {
     int count_none = 0;
-    for (int i = 0; i < vec->size; ++i) {
-        for (int j = 0; j < vec->size; ++j) {
-            if (vec->arr[i][j] == NONE) {
-                ++count_none;
-            }
+    for (int i = 0; i < vec->size * vec->size; ++i) {
+        if (vec->arr[i] == NONE) {
+            ++count_none;
         }
     }
 
     int* changes = (int*)malloc(count_none * sizeof(int));
 
-    for (int i = 0, k = 0; i < vec->size; ++i) {
-        for (int j = 0; j < vec->size; ++j) {
-            if (vec->arr[i][j] == NONE) {
-                changes[k++] = i * vec->size + j + 1;
-            }
+    for (int i = 0, k = 0; i < vec->size*vec->size; ++i) {
+        if (vec->arr[i] == NONE) {
+            changes[k++] = i + 1;
         }
     }
 
@@ -292,15 +281,6 @@ FieldType BestResult(const Vector* const vec, int m, FieldType type) {
 }
 */
 
-// Вспомогательная функция для копирования вектора
-Vector CopyVector(const Vector* const vec) {
-    Vector newvec = {(FieldType**)malloc(vec->size * sizeof(FieldType*)), vec->size};
-    for (int i = 0; i < vec->size; ++i) {
-        newvec.arr[i] = (FieldType*)malloc(vec->size * sizeof(FieldType));
-        memcpy(newvec.arr[i], vec->arr[i], vec->size * sizeof(FieldType));
-    }
-    return newvec;
-}
 
 FieldType BestResult(const Vector* const vec, int m, FieldType type) {
     FieldType checkend = CheckEnd(vec);
@@ -310,21 +290,13 @@ FieldType BestResult(const Vector* const vec, int m, FieldType type) {
     Changes p = GetChanges(vec);
     FieldType* arr = (FieldType*)malloc(p.size * sizeof(FieldType));
 
-    Vector newvec = {(FieldType**)malloc(vec->size * sizeof(FieldType*)), vec->size};
-    for (int k = 0; k < vec->size; ++k) {
-        newvec.arr[k] = (FieldType*)malloc(vec->size * sizeof(FieldType));
-    }
+    Vector newvec = {(FieldType*)malloc(vec->size*vec->size * sizeof(FieldType)), vec->size};
 
     for (int i = 0; i < p.size; ++i) {
-        for (int k = 0; k < vec->size; ++k) {
-            memcpy(newvec.arr[k], vec->arr[k], vec->size * sizeof(FieldType));
-        }
+        memcpy(newvec.arr, vec->arr, vec->size*vec->size * sizeof(FieldType));
 
-        newvec.arr[(p.arr[i] - 1) / vec->size][(p.arr[i] - 1) % vec->size] = type;
+        newvec.arr[p.arr[i] - 1] = type;
         arr[i] = BestResult(&newvec, m - 1, (type % 2) + 1);
-    }
-    for (int k = 0; k < vec->size; ++k) {
-        free(newvec.arr[k]);
     }
     free(newvec.arr);
 
@@ -359,37 +331,25 @@ int GetRandomStep(const Vector* const vec) {
     return step;
 }
 
-/*
-
-*/
-
 int GetStep(const Vector* const vec, int _difficulty, FieldType _player_type_field) {
     Changes p = GetChanges(vec);
 
     int depth = _difficulty == EASY     ? 2
                 : _difficulty == MEDIUM ? /*(p.size / 2 % 2 == 1 ? p.size / 2 + 1 : p.size / 2)*/ 6
-                                        : /*(p.size % 2 == 1 ? p.size / 2 + 1 : p.size)*/10;
+                                        : /*(p.size % 2 == 1 ? p.size / 2 + 1 : p.size)*/ 10;
 
     FieldType* arr = (FieldType*)malloc(p.size * sizeof(FieldType));
 
-    Vector newvec = {(FieldType**)malloc(vec->size * sizeof(FieldType*)), vec->size};
-    for (int k = 0; k < vec->size; ++k) {
-        newvec.arr[k] = (FieldType*)malloc(vec->size * sizeof(FieldType));
-    }
+    Vector newvec = {(FieldType*)malloc(vec->size*vec->size * sizeof(FieldType)), vec->size};
 
     for (int i = 0; i < p.size; ++i) {
-        for (int k = 0; k < vec->size; ++k) {
-            memcpy(newvec.arr[k], vec->arr[k], vec->size * sizeof(FieldType));
-        }
+        memcpy(newvec.arr, vec->arr, vec->size * vec->size * sizeof(FieldType));
 
-        newvec.arr[(p.arr[i] - 1) / vec->size][(p.arr[i] - 1) % vec->size] =
+        newvec.arr[p.arr[i] - 1] =
             (_player_type_field % 2) + 1;
         arr[i] = BestResult(&newvec, depth, _player_type_field);
     }
 
-    for (int k = 0; k < vec->size; ++k) {
-        free(newvec.arr[k]);
-    }
     free(newvec.arr);
 
     int step = -1;
@@ -431,12 +391,12 @@ bool Step(Game* game, int step) {
                     : GetStep(&game->_batlefield, game->_difficulty, game->_player_type_field));
     }
     --step;
-    const int row = step / game->_batlefield.size, col = step % game->_batlefield.size;
-    if (game->_batlefield.arr[row][col] != NONE) {
+    // const int row = step / game->_batlefield.size, col = step % game->_batlefield.size;
+    if (game->_batlefield.arr[step] != NONE) {
         return false;
     }
     game->_player_turn = !game->_player_turn;
-    game->_batlefield.arr[row][col] = game->_turn;
+    game->_batlefield.arr[step] = game->_turn;
     game->_turn = (game->_turn % 2) + 1;
     return true;
 }
